@@ -45,6 +45,23 @@ struct DesktopCardView: View {
     @State private var hoveringRow: UUID?
     @State private var dissolveProgress: CGFloat = 0
     @State private var lastDragMouse: CGPoint?
+    @State private var rowFrames: [UUID: CGRect] = [:]
+    @State private var pulse = false
+
+    /// 每行在卡片坐标系里的位置，点击时用它算起爆点（滚动后也准）
+    private struct RowFramePreferenceKey: PreferenceKey {
+        static let defaultValue: [UUID: CGRect] = [:]
+
+        static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
+            value.merge(nextValue()) { _, new in new }
+        }
+    }
+
+    /// 系统开了「减弱动态效果」时只留冲击环和卡片脉冲
+    private var reduceMotion: Bool {
+        ProcessInfo.processInfo.environment["UTODO_REDUCE_MOTION"] != nil
+            || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
 
     /// 右键菜单里的三档玻璃底色；CLI 可以填任意值，菜单只负责常用档位
     static let glassPresets: [(name: String, value: Double)] = [
@@ -66,7 +83,20 @@ struct DesktopCardView: View {
         .padding(.top, 12)
         .padding(.bottom, 10)
         .frame(width: Theme.cardWidth, alignment: .top)
+        .coordinateSpace(name: "card")
+        .onPreferenceChange(RowFramePreferenceKey.self) { rowFrames = $0 }
         .background(GlassBackground(opacity: model.config.glassOpacity))
+        .overlay {
+            if !model.bursts.isEmpty {
+                FireworksOverlay(
+                    bursts: model.bursts.bursts,
+                    reduceMotion: reduceMotion,
+                    frozenAt: isPreview ? Date() : nil
+                )
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
+        .scaleEffect(pulse ? 1.015 : 1.0)
         .shadow(color: .black.opacity(0.14), radius: 5, x: 0, y: 2)
         .contentShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
         .contextMenu {
@@ -95,6 +125,13 @@ struct DesktopCardView: View {
         }
         .animation(.easeOut(duration: 0.18), value: model.active)
         .onChange(of: model.cardHeight) { _, height in onHeightChange(height) }
+        .onChange(of: model.bursts.bursts.count) { _, count in
+            guard count > 0 else { return }
+            withAnimation(.easeOut(duration: 0.10)) { pulse = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) {
+                withAnimation(.easeOut(duration: 0.18)) { pulse = false }
+            }
+        }
         .onAppear { onHeightChange(model.cardHeight) }
         .onChange(of: model.focusTick) { _, _ in inputFocused = true }
         .onChange(of: inputFocused) { _, focused in onEditingChange(focused) }
@@ -213,7 +250,7 @@ struct DesktopCardView: View {
 
     private func row(_ todo: Todo) -> some View {
         HStack(spacing: 9) {
-            Button { model.complete(todo) } label: {
+            Button { complete(todo) } label: {
                 Circle()
                     .strokeBorder(Color.white.opacity(0.38), lineWidth: 1.2)
                     .frame(width: 16, height: 16)
@@ -229,7 +266,7 @@ struct DesktopCardView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .contentShape(Rectangle())
-                .onTapGesture { model.complete(todo) }
+                .onTapGesture { complete(todo) }
 
             Spacer(minLength: 0)
 
@@ -249,6 +286,14 @@ struct DesktopCardView: View {
         }
         .padding(.horizontal, 4)
         .frame(height: Theme.rowHeight)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: RowFramePreferenceKey.self,
+                    value: [todo.id: proxy.frame(in: .named("card"))]
+                )
+            }
+        }
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Theme.hairline)
@@ -261,6 +306,12 @@ struct DesktopCardView: View {
 
     private func indexIsFirst(_ todo: Todo) -> Bool {
         model.active.first?.id == todo.id
+    }
+
+    /// 起爆点 = 被点那一行的圆圈中心（行内左边距 4 + 圆半径 8）
+    private func complete(_ todo: Todo) {
+        let origin = rowFrames[todo.id].map { CGPoint(x: $0.minX + 12, y: $0.midY) }
+        model.complete(todo, burstAt: origin)
     }
 
     // MARK: - 已完成

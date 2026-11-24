@@ -52,15 +52,16 @@ public enum Firework {
             let delay = firstWave
                 ? Double.random(in: 0...0.02, using: &rng)
                 : Double.random(in: 0.06...0.14, using: &rng)
-            let angle = CGFloat.random(in: (-152 * .pi / 180)...(-28 * .pi / 180), using: &rng)
 
-            var speed = CGFloat.random(in: 80...210, using: &rng)
-            // 上升速度封顶 130pt/s，否则上半圆的粒子一秒内全部飞出画面
-            let verticalLimit = 130 / -sin(angle)
-            speed = min(speed, verticalLimit)
+            // 按速度分量采样再合成：只夹纵向会把爆点压成一条横线，
+            // 两个分量都夹住才是圆的绽放
+            let velocityX = CGFloat.random(in: -70...200, using: &rng)
+            let velocityY = CGFloat.random(in: -170...(-20), using: &rng)
+            let speed = hypot(velocityX, velocityY)
+            let burstAngle = atan2(velocityY, velocityX)
 
             return Particle(
-                angle: angle,
+                angle: burstAngle,
                 speed: speed,
                 delay: delay,
                 life: Double.random(in: 0.7...1.0, using: &rng),

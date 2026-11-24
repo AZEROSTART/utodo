@@ -14,6 +14,7 @@ final class CardViewModel {
     private(set) var active: [Todo] = []
     private(set) var completed: [Todo] = []
     private(set) var dissolving: [Todo] = []
+    private(set) var bursts = BurstList()
     private(set) var loadError: String?
     private(set) var config: AppConfig
     var draft: String = ""
@@ -92,14 +93,25 @@ final class CardViewModel {
         }
     }
 
-    func complete(_ todo: Todo) {
+    func complete(_ todo: Todo, burstAt origin: CGPoint?) {
         guard let store else { return }
         do {
             _ = try store.complete(idPrefix: todo.id.uuidString)
             reload()
+            if let origin { addBurst(at: origin) }
             postStoreChanged()
         } catch {
             loadError = "没标上完成：\(describe(error))"
+        }
+    }
+
+    /// 记一次彩纸爆点。最多同时 3 组（由 BurstList 丢最旧），到点自动清掉
+    func addBurst(at origin: CGPoint, startedAt: Date = Date()) {
+        bursts.append(FireworkBurst(origin: origin, seed: .random(in: 0..<UInt64.max), startedAt: startedAt))
+        let wait = max(0, startedAt.addingTimeInterval(Firework.maxLifetime + 0.2).timeIntervalSinceNow)
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(wait))
+            bursts.prune(at: Date())
         }
     }
 

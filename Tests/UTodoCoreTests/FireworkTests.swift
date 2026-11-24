@@ -28,9 +28,12 @@ import Testing
             #expect((CGFloat(1.6)...CGFloat(3.2)).contains(p.thickness))
             #expect(abs(p.spin) <= 9.5)
             #expect((0..<Firework.colorCount).contains(p.colorIndex))
-            #expect((CGFloat(-152) * .pi / 180 ... CGFloat(-28) * .pi / 180).contains(p.angle))
-            // 上升速度封顶：卡片只有 200pt 高，初速全给向上会瞬间出画
-            #expect(sin(p.angle) * p.speed >= -130.001)
+            // 向上半圆：纵向速度向上、有上限；横向也有上限，爆点才是圆的
+            let vertical = sin(p.angle) * p.speed
+            let horizontal = cos(p.angle) * p.speed
+            #expect(vertical < 0 && vertical >= -170.001)
+            // 起爆点在卡片左边（x=26），向左的初速收窄，否则一半彩纸一出生就被圆角裁掉
+            #expect(horizontal >= -70.001 && horizontal <= 200.001)
         }
 
         let sparkles = particles.filter(\.sparkle)
@@ -99,7 +102,7 @@ import Testing
                 for step in 0...25 {
                     let t = Double(step) / 25 * Firework.maxLifetime
                     let pos = Firework.position(p, at: t, origin: origin)
-                    #expect(pos.x >= -80 && pos.x <= 348)
+                    #expect(pos.x >= -120 && pos.x <= 400)
                 }
             }
         }

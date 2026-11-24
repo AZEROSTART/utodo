@@ -22,6 +22,10 @@ enum PreviewRenderer {
 
         let model = CardViewModel(store: store)
         model.showsCompleted = true
+        if ProcessInfo.processInfo.environment["UTODO_PREVIEW_BURST"] != nil {
+            let age = ProcessInfo.processInfo.environment["UTODO_PREVIEW_BURST_AGE"].flatMap(Double.init) ?? 0.3
+            model.addBurst(at: CGPoint(x: 26, y: 113), startedAt: Date().addingTimeInterval(-age))
+        }
         if ProcessInfo.processInfo.environment["UTODO_PREVIEW_DISSOLVE"] != nil {
             model.clearCompleted()
         }
