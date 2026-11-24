@@ -12,6 +12,10 @@ final class PanelController {
     private let panel: NSPanel
     private let placementKey = "panel.placement"
     private var installedHeight: CGFloat = 0
+    private let fullscreenMonitor = FullscreenMonitor()
+    private var isFullscreenVisible = false
+    private var isHovering = false
+    private var isEditing = false
 
     init() {
         let size = CGSize(width: Self.panelWidth, height: Self.cardHeight + Theme.panelMargin * 2)
@@ -60,9 +64,20 @@ final class PanelController {
     }
 
     func install(model: CardViewModel) {
-        let view = DesktopCardView(model: model) { [weak self] cardHeight in
-            self?.resize(toCardHeight: cardHeight)
-        }
+        let view = DesktopCardView(
+            model: model,
+            onHeightChange: { [weak self] cardHeight in
+                self?.resize(toCardHeight: cardHeight)
+            },
+            onHoverChange: { [weak self] inside in
+                self?.isHovering = inside
+                self?.applyAlpha()
+            },
+            onEditingChange: { [weak self] editing in
+                self?.isEditing = editing
+                self?.applyAlpha()
+            }
+        )
         .padding(Theme.panelMargin)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         let host = NSHostingView(rootView: view)
@@ -74,6 +89,22 @@ final class PanelController {
         )
         panel.contentView = host
         resize(toCardHeight: model.cardHeight)
+
+        fullscreenMonitor.start(panel: panel) { [weak self] isFullscreen in
+            self?.isFullscreenVisible = isFullscreen
+            self?.applyAlpha()
+        }
+    }
+
+    private func applyAlpha() {
+        let dimmed = isFullscreenVisible && !isHovering && !isEditing
+        let target: CGFloat = dimmed ? Theme.dimAlpha : 1.0
+        guard abs(panel.alphaValue - target) > 0.01 else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Theme.dimDuration
+            context.allowsImplicitAnimation = true
+            panel.animator().alphaValue = target
+        }
     }
 
     private func resize(toCardHeight cardHeight: CGFloat) {

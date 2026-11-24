@@ -32,6 +32,8 @@ struct GlassBackground: View {
 struct DesktopCardView: View {
     @Bindable var model: CardViewModel
     var onHeightChange: (CGFloat) -> Void
+    var onHoverChange: (Bool) -> Void = { _ in }
+    var onEditingChange: (Bool) -> Void = { _ in }
     var isPreview: Bool = false
 
     @FocusState private var inputFocused: Bool
@@ -65,6 +67,8 @@ struct DesktopCardView: View {
         .onChange(of: model.cardHeight) { _, height in onHeightChange(height) }
         .onAppear { onHeightChange(model.cardHeight) }
         .onChange(of: model.focusTick) { _, _ in inputFocused = true }
+        .onChange(of: inputFocused) { _, focused in onEditingChange(focused) }
+        .onHover { inside in onHoverChange(inside) }
     }
 
     // MARK: - 头部
