@@ -46,8 +46,7 @@ public enum Firework {
         }
     }
 
-    public static func particles(seed: UInt64) -> [Particle] {
-        var rng = SplitMix64(state: seed)
+    public static func particles(seed: UInt64) -> [Particle] {        var rng = SplitMix64(state: seed)
         return (0..<particleCount).map { index in
             let firstWave = index < firstWaveCount
             let delay = firstWave
@@ -72,6 +71,36 @@ public enum Firework {
                 sparkle: Int.random(in: 0..<5, using: &rng) == 0
             )
         }
+    }
+
+    // MARK: - 轨迹（解析求值，不存每帧）
+
+    /// 粒子在 `t` 秒时的位置；`t` 超过寿命后停在寿命终点（由透明度负责让它消失）
+    public static func position(_ p: Particle, at t: TimeInterval, origin: CGPoint) -> CGPoint {
+        let c = clampedTime(p, at: t)
+        // 空气阻尼：横向扩散不会冲出卡片，竖向保留一点飘落感
+        let damping = max(0, 1 - 0.5 * c)
+        return CGPoint(
+            x: origin.x + cos(p.angle) * p.speed * c * damping,
+            y: origin.y + sin(p.angle) * p.speed * c * damping + 0.5 * gravity * c * c
+        )
+    }
+
+    /// 1 → 0 的淡出：前 65% 寿命不透明，之后线性消失
+    public static func opacity(_ p: Particle, at t: TimeInterval) -> CGFloat {
+        let local = t - p.delay
+        guard local > 0, local < p.life else { return local == 0 ? 1 : 0 }
+        let fadeStart = 0.65 * p.life
+        guard local > fadeStart else { return 1 }
+        return CGFloat(1 - (local - fadeStart) / (p.life - fadeStart))
+    }
+
+    public static func rotation(_ p: Particle, at t: TimeInterval) -> CGFloat {
+        p.spin * clampedTime(p, at: t)
+    }
+
+    private static func clampedTime(_ p: Particle, at t: TimeInterval) -> CGFloat {
+        CGFloat(min(max(0, t - p.delay), p.life))
     }
 }
 
