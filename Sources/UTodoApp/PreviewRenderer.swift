@@ -27,15 +27,26 @@ enum PreviewRenderer {
         }
 
         let desktop = ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.16, green: 0.15, blue: 0.32),
-                    Color(red: 0.11, green: 0.19, blue: 0.27),
-                    Color(red: 0.30, green: 0.18, blue: 0.22),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            if ProcessInfo.processInfo.environment["UTODO_PREVIEW_BG"] == "light" {
+                LinearGradient(
+                    colors: [
+                        Color(white: 0.93),
+                        Color(white: 0.87),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.16, green: 0.15, blue: 0.32),
+                        Color(red: 0.11, green: 0.19, blue: 0.27),
+                        Color(red: 0.30, green: 0.18, blue: 0.22),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
             VStack {
                 HStack {
                     Spacer()

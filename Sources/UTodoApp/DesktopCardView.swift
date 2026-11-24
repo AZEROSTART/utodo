@@ -26,8 +26,6 @@ struct GlassBackground: View {
                         lineWidth: 1
                     )
             }
-            .shadow(color: .black.opacity(0.42), radius: 22, x: 0, y: 12)
-            .shadow(color: .black.opacity(0.20), radius: 3, x: 0, y: 1)
     }
 }
 
@@ -65,6 +63,7 @@ struct DesktopCardView: View {
         .padding(.bottom, 10)
         .frame(width: Theme.cardWidth, alignment: .top)
         .background(GlassBackground(opacity: model.config.glassOpacity))
+        .shadow(color: .black.opacity(0.14), radius: 5, x: 0, y: 2)
         .contentShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
         .contextMenu {
             Button("添加一件事") { onRequestFocus() }

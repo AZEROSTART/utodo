@@ -103,6 +103,7 @@ swift build --product utodo                        # CLI 在 .build/debug/utodo
 ./Scripts/build-app.sh                             # App 在 build/UTodo.app
 ./Scripts/cli-smoke.sh .build/debug/utodo          # CLI 冒烟
 ./build/UTodo.app/Contents/MacOS/UTodo --render-preview /tmp/preview.png   # 离屏渲染卡片
+UTODO_PREVIEW_BG=light ./build/UTodo.app/Contents/MacOS/UTodo --render-preview /tmp/light.png  # 浅色背景下看阴影
 ```
 
 `--render-preview` 不需要屏幕录制权限，用于在没有截图权限的环境里检查界面。
