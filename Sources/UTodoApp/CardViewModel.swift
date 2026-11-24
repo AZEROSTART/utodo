@@ -32,9 +32,12 @@ final class CardViewModel {
         } else {
             height += CGFloat(min(active.count, Theme.maxVisibleRows)) * Theme.rowHeight
         }
-        if !completed.isEmpty || !dissolving.isEmpty { height += 26 }
+        if !completed.isEmpty { height += 26 }
         if showsCompleted {
             height += CGFloat(min(completed.count, Theme.maxVisibleRows)) * Theme.rowHeight + 4
+        }
+        if !dissolving.isEmpty {
+            height += CGFloat(min(dissolving.count, Theme.maxVisibleRows)) * Theme.rowHeight + 4
         }
         height += 10
         return height

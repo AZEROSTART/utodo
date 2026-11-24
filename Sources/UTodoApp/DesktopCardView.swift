@@ -38,6 +38,7 @@ struct DesktopCardView: View {
 
     @FocusState private var inputFocused: Bool
     @State private var hoveringRow: UUID?
+    @State private var dissolveProgress: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -46,6 +47,7 @@ struct DesktopCardView: View {
             activeRows
             completedFooter
             if model.showsCompleted { completedRows }
+            if !model.dissolving.isEmpty { dissolvingRows }
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
@@ -214,12 +216,12 @@ struct DesktopCardView: View {
 
     private var completedFooter: some View {
         Group {
-            if model.completedCount > 0 || !model.dissolving.isEmpty {
+            if model.completedCount > 0 {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { model.showsCompleted.toggle() }
                 } label: {
                     HStack(spacing: 5) {
-                        Text("\(model.completedCount + model.dissolving.count) 已完成")
+                        Text("\(model.completedCount) 已完成")
                             .font(.system(size: 10.5))
                             .foregroundStyle(Theme.faintText)
                         Image(systemName: model.showsCompleted ? "chevron.up" : "chevron.right")
@@ -242,34 +244,65 @@ struct DesktopCardView: View {
     private var completedRows: some View {
         VStack(spacing: 0) {
             ForEach(model.completed.prefix(Theme.maxVisibleRows)) { todo in
-                HStack(spacing: 9) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.white.opacity(0.28))
-                    Text(todo.title)
-                        .font(.system(size: Theme.bodySize))
-                        .foregroundStyle(Color.white.opacity(0.40))
-                        .strikethrough(color: Color.white.opacity(0.30))
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    if hoveringRow == todo.id {
-                        Button { model.delete(todo) } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.55))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 4)
-                .frame(height: Theme.rowHeight)
-                .overlay(alignment: .top) {
-                    Rectangle().fill(Theme.hairline).frame(height: 1)
-                }
-                .contentShape(Rectangle())
-                .onHover { inside in hoveringRow = inside ? todo.id : nil }
+                completedRow(todo, interactive: true)
             }
         }
         .transition(.opacity)
+    }
+
+    // MARK: - 清除特效
+
+    private var dissolvingRows: some View {
+        VStack(spacing: 0) {
+            ForEach(model.dissolving.prefix(Theme.maxVisibleRows)) { todo in
+                completedRow(todo, interactive: false)
+                    .offset(y: -9 * dissolveProgress)
+                    .opacity(1 - dissolveProgress)
+                    .blur(radius: 1.6 * dissolveProgress)
+            }
+        }
+        .onAppear { startDissolve() }
+        .onChange(of: model.dissolving) { _, rows in
+            if !rows.isEmpty { startDissolve() }
+        }
+    }
+
+    private func startDissolve() {
+        dissolveProgress = 0
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.35)) { dissolveProgress = 1 }
+        }
+    }
+
+    private func completedRow(_ todo: Todo, interactive: Bool) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(Color.white.opacity(0.28))
+            Text(todo.title)
+                .font(.system(size: Theme.bodySize))
+                .foregroundStyle(Color.white.opacity(0.40))
+                .strikethrough(color: Color.white.opacity(0.30))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            if interactive, hoveringRow == todo.id {
+                Button { model.delete(todo) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 4)
+        .frame(height: Theme.rowHeight)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Theme.hairline).frame(height: 1)
+        }
+        .contentShape(Rectangle())
+        .onHover { inside in
+            guard interactive else { return }
+            hoveringRow = inside ? todo.id : nil
+        }
     }
 }

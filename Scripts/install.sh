@@ -1,0 +1,23 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
+
+APP_DIR="$HOME/Applications"
+BIN_DIR="$HOME/.local/bin"
+
+./Scripts/build-app.sh
+swift build -c release --product utodo --scratch-path .build-app
+
+mkdir -p "$APP_DIR" "$BIN_DIR"
+rm -rf "$APP_DIR/UTodo.app"
+cp -R build/UTodo.app "$APP_DIR/UTodo.app"
+cp .build-app/release/utodo "$BIN_DIR/utodo"
+chmod +x "$BIN_DIR/utodo"
+
+echo "App:  $APP_DIR/UTodo.app"
+echo "CLI:  $BIN_DIR/utodo"
+echo
+echo "如果 $BIN_DIR 还不在 PATH 里，把这行加进 ~/.zshrc："
+echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""

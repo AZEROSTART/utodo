@@ -22,6 +22,9 @@ enum PreviewRenderer {
 
         let model = CardViewModel(store: store)
         model.showsCompleted = true
+        if ProcessInfo.processInfo.environment["UTODO_PREVIEW_DISSOLVE"] != nil {
+            model.clearCompleted()
+        }
 
         let desktop = ZStack {
             LinearGradient(
