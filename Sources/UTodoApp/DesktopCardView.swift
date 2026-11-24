@@ -168,33 +168,32 @@ struct DesktopCardView: View {
         HStack(spacing: 9) {
             Button { model.complete(todo) } label: {
                 Circle()
-                    .strokeBorder(Color.white.opacity(0.34), lineWidth: 1.2)
-                    .frame(width: 15, height: 15)
+                    .strokeBorder(Color.white.opacity(0.38), lineWidth: 1.2)
+                    .frame(width: 16, height: 16)
+                    // 描边形状只在外圈命中，补一块实心命中区，点圆心才算点到
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .help("完成")
 
             Text(todo.title)
                 .font(.system(size: Theme.bodySize))
                 .foregroundStyle(Theme.primaryText)
                 .lineLimit(1)
                 .truncationMode(.tail)
+                .contentShape(Rectangle())
+                .onTapGesture { model.complete(todo) }
 
             Spacer(minLength: 0)
 
             if hoveringRow == todo.id {
-                HStack(spacing: 6) {
-                    Button { model.complete(todo) } label: {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.75))
-                    }
-                    .buttonStyle(.plain)
-                    .help("完成")
-
+                HStack(spacing: 8) {
                     Button { model.delete(todo) } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Color.white.opacity(0.55))
+                            .frame(width: 16, height: 16)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help("删除")

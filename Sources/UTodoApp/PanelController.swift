@@ -151,7 +151,7 @@ final class PanelController {
         )
         .padding(Theme.panelMargin)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        let host = NSHostingView(rootView: view)
+        let host = ClickThroughHostingView(rootView: view)
         host.frame = CGRect(
             x: 0,
             y: 0,
