@@ -51,10 +51,11 @@ final class FullscreenMonitor {
         let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
         let snapshots: [WindowSnapshot] = info.compactMap { entry in
             guard let pid = entry[kCGWindowOwnerPID as String] as? pid_t,
+                  let layer = entry[kCGWindowLayer as String] as? Int32,
                   let dict = entry[kCGWindowBounds as String] as? NSDictionary,
                   let rect = CGRect(dictionaryRepresentation: dict as CFDictionary)
             else { return nil }
-            return WindowSnapshot(ownerPID: pid, bounds: rect)
+            return WindowSnapshot(ownerPID: pid, bounds: rect, layer: layer)
         }
 
         publish(FullscreenDetector.isFullscreen(

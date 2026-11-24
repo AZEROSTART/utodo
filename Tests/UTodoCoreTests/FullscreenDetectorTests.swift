@@ -32,6 +32,15 @@ import Testing
         ))
     }
 
+    @Test func nonNormalWindowLayersAreIgnored() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        #expect(!FullscreenDetector.isFullscreen(
+            frontPID: 42,
+            windows: [.init(ownerPID: 42, bounds: screen, layer: 25)],
+            screenFrame: screen
+        ))
+    }
+
     @Test func toleranceAbsorbsOnePointRounding() {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
         let inset = screen.insetBy(dx: 1, dy: 1)
