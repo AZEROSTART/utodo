@@ -40,13 +40,28 @@
 
 卡片右键 → 「透明度」子菜单：通透 `0.12` / 标准 `0.30` / 实心 `0.55`（当前项打勾）。改完写 JSON 并发通知，立即生效。
 
+## 给 agent：agent 怎么知道有这些命令
+
+agent 不会读 README，它只会先跑 `utodo --help`、`utodo`、或者照错误提示改。所以发现路径就这三个：
+
+1. **`utodo --help` / 直接跑 `utodo`**：完整帮助打到 stdout、退出码 0（不是错误）。帮助里每个命令都带一行例子，`config` 部分写明两个键、范围、默认值，以及 `utodo config set glass 0.5` 这种可直接复制的例子。
+2. **报错即说明书**：`utodo config set foo 1` → stderr 列出可用键（`glass`、`dim`）和一句例子，退出 2；`set glass 1.5` → 说明范围 `0…1` 并保留原值。agent 从错误里就能学会正确用法。
+3. **`utodo config` 不带参数**：打印当前值和改法，一行一个：
+
+   ```text
+   glassOpacity=0.3    # 卡片玻璃底色，0 最透、1 最实；改：utodo config set glass 0.5
+   dimAlpha=0.55       # 全屏时整窗 alpha；改：utodo config set dim 0.35
+   ```
+
+机器读用 `utodo config --json`；人读用不带参数的版本。
+
 ## 给 agent：`utodo config`
 
 ```bash
-utodo config                       # 当前值，一行一个：glassOpacity=0.3
+utodo config                       # 当前值 + 改法，一行一个
 utodo config --json                # {"glassOpacity":0.3,"dimAlpha":0.55}
 utodo config get glass             # 0.3
-utodo config set glass 0.5         # glassOpacity: 0.3 → 0.45，立即上屏
+utodo config set glass 0.5         # glassOpacity: 0.3 → 0.5，立即上屏
 utodo config set dim 0.35          # dimAlpha: 0.55 → 0.35
 utodo config set glass 1.5         # stderr：超出范围 0…1，退出 2，文件不动
 utodo config set foo 1             # stderr：未知键，列出可用键，退出 2
@@ -55,9 +70,13 @@ utodo config set foo 1             # stderr：未知键，列出可用键，退�
 - 键名支持短别名：`glass` → `glassOpacity`，`dim` → `dimAlpha`
 - 每次修改都打印 `旧值 → 新值`，agent 不用再读一次确认
 - 修改是原子的，且立即 post `com.azerostart.utodo.configChanged`，App 收到后重读 JSON 并应用
-- 退出码沿用 CLI 约定：`0` 成功 / `2` 用法或取值错误
+- 退出码沿用 CLI 约定：`0` 成功（含 `--help`）/ `1` 没找到 / `2` 用法或取值错误
 
 agent 的典型用法：`utodo config set glass 0.5`（想更实一点时），或 `utodo config --json` 先读现状再决定改多少。
+
+## 退出码的调整
+
+`utodo --help`、不带参数的 `utodo` 改成 **stdout + 退出 0**（现在是 stderr + 2）。理由：agent 探路时第一条命令通常是 `--help`，返回非零会被它当成"这工具坏了"；真正的用法错误（未知命令/参数、取值越界）仍然 `exit 2`。`Scripts/cli-smoke.sh` 里 `--help` 断言 2 要跟着改成 0。
 
 ## 实现要点
 

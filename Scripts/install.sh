@@ -22,5 +22,9 @@ echo "CLI:  $BIN_DIR/utodo"
 echo
 echo "如果 $BIN_DIR 还不在 PATH 里，把这行加进 ~/.zshrc："
 echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+echo
+echo "想让你的 AI 记住怎么用 utodo："
+echo "  utodo agent install     # 往 ~/AGENTS.md 追加一段说明，幂等，可 uninstall"
+echo
 
 open "$APP_DIR/UTodo.app"

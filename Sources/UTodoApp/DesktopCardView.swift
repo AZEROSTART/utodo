@@ -2,12 +2,14 @@ import SwiftUI
 import UTodoCore
 
 struct GlassBackground: View {
+    var opacity: Double = AppConfig.default.glassOpacity
+
     var body: some View {
         RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
             .fill(.ultraThinMaterial)
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
-                    .fill(Color.black.opacity(0.30))
+                    .fill(Color.black.opacity(opacity))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.corner, style: .continuous)
@@ -42,6 +44,13 @@ struct DesktopCardView: View {
     @State private var hoveringRow: UUID?
     @State private var dissolveProgress: CGFloat = 0
 
+    /// 右键菜单里的三档玻璃底色；CLI 可以填任意值，菜单只负责常用档位
+    static let glassPresets: [(name: String, value: Double)] = [
+        ("通透", 0.12),
+        ("标准", 0.30),
+        ("实心", 0.55),
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
@@ -55,10 +64,23 @@ struct DesktopCardView: View {
         .padding(.top, 12)
         .padding(.bottom, 10)
         .frame(width: Theme.cardWidth, alignment: .top)
-        .background(GlassBackground())
+        .background(GlassBackground(opacity: model.config.glassOpacity))
         .contentShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
         .contextMenu {
             Button("添加一件事") { onRequestFocus() }
+            Menu("透明度") {
+                ForEach(Self.glassPresets, id: \.value) { preset in
+                    Button {
+                        model.setGlassOpacity(preset.value)
+                    } label: {
+                        if abs(model.config.glassOpacity - preset.value) < 0.005 {
+                            Label(preset.name, systemImage: "checkmark")
+                        } else {
+                            Text(preset.name)
+                        }
+                    }
+                }
+            }
             Button(model.showsCompleted ? "收起已完成" : "显示已完成") {
                 withAnimation(.easeInOut(duration: 0.2)) { model.showsCompleted.toggle() }
             }

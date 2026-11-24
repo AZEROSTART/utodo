@@ -20,6 +20,8 @@ final class PanelController {
     private var isHovering = false
     private var isEditing = false
     private var pendingPlacementSave: DispatchWorkItem?
+    private var dimAlpha = AppConfig.default.dimAlpha
+    nonisolated(unsafe) private var configToken: NSObjectProtocol?
 
     init() {
         let size = CGSize(width: Self.panelWidth, height: Self.cardHeight + Theme.panelMargin * 2)
@@ -197,11 +199,23 @@ final class PanelController {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.placeOnScreen() }
         }
+
+        dimAlpha = ConfigStore().load().dimAlpha
+        configToken = DistributedNotificationCenter.default().addObserver(
+            forName: configChangedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.dimAlpha = ConfigStore().load().dimAlpha
+                self?.applyAlpha()
+            }
+        }
     }
 
     private func applyAlpha() {
         let dimmed = isFullscreenVisible && !isHovering && !isEditing
-        let target: CGFloat = dimmed ? Theme.dimAlpha : 1.0
+        let target: CGFloat = dimmed ? dimAlpha : 1.0
         guard abs(panel.alphaValue - target) > 0.01 else { return }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Theme.dimDuration

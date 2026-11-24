@@ -6,8 +6,9 @@
 
 - 常驻桌面，不抢焦点、不弹通知、没有 Dock 图标
 - 一屏最多 5 条未完成，多了滚动；已完成折叠在底部，可以逐条删或一次清空
-- 切到全屏应用时整张卡自动变淡（alpha 0.55），鼠标移上去或开始输入就恢复
+- 切到全屏应用时整张卡自动变淡，鼠标移上去或开始输入就恢复
 - `⌥Space` 在任何 App 里把卡片叫到前台并聚焦输入框；点别处或按 Esc，键盘立刻还给原来的 App，没输入完的草稿还在
+- 玻璃底色和「全屏时变多淡」都能调：右键菜单三档，或者 `utodo config set glass 0.5`
 
 ## 安装
 
@@ -32,6 +33,24 @@ export PATH="$HOME/.local/bin:$PATH"
 
 启动：`open ~/Applications/UTodo.app`
 
+## 让你的 AI 用起来
+
+装完之后跑一次：
+
+```bash
+utodo agent install
+```
+
+它做三件事，全部幂等，重复跑只更新不重复：
+
+- 往 `~/AGENTS.md` 追加一小段说明（带 `<!-- utodo:begin -->` / `<!-- utodo:end -->` 标记），告诉 agent：用户说「记个待办 / 帮我记一下 / 别忘了 X」时用 `utodo add`，不要只在聊天里复述
+- 如果 `~/.claude/CLAUDE.md` 存在且不是软链，同样追加一段
+- 把完整说明书写到 `~/.local/share/utodo/SKILL.md`（`utodo --help` 里也有一份精简版）
+
+`utodo agent print` 只打印要追加的内容，想手动贴到别的 agent 配置文件里就用它；`utodo agent uninstall` 把自己写过的东西原样撤掉，不碰你原有的文字。
+
+仓库里的 `Skill/SKILL.md` 就是这份说明书的源文件，支持 skill 目录的工具可以直接拷贝使用。
+
 ## 命令行
 
 ```bash
@@ -42,8 +61,13 @@ utodo list --json              # JSON 数组，含 created_at / completed_at
 utodo done a1b2c3d4            # 短 id 前缀匹配，唯一即可
 utodo rm a1b2c3d4              # 删除
 utodo clear                    # 清除全部已完成，输出「已清除 N 条」
+utodo config                   # 看透明度配置（glassOpacity / dimAlpha）
+utodo config set glass 0.5     # 玻璃底色：0 最透、1 最实（默认 0.3），立即上屏
+utodo config set dim 0.35      # 全屏时整窗 alpha（默认 0.55，范围 0.05…1）
 utodo --version
 ```
+
+`config set` 每次打印「旧值 → 新值」，越界或未知键退出 `2` 且不动文件。配置存在 `~/Library/Application Support/utodo/config.json`（`UTODO_CONFIG` 可覆盖），App 和 CLI 共用。
 
 退出码：`0` 成功 / `1` 没找到或前缀有歧义 / `2` 用法错误。
 
@@ -66,7 +90,7 @@ CLI 和 App 直接读写同一个 SQLite 文件（`~/Library/Application Support
 | 点左边的圈或标题 | 标记完成（点圈心也算，不用点在那圈细线上） |
 | 悬停某行 | 右侧浮出删除 |
 | 点底部「N 已完成」 | 展开已完成，可逐条删 |
-| 右键卡片 | 添加 / 显示已完成 / 清除已完成 / 退出 |
+| 右键卡片 | 添加 / 透明度三档 / 显示已完成 / 清除已完成 / 退出 |
 | 拖动卡片 | 位置记住，换屏也跟着走；屏幕拔了退回主屏 |
 | Esc 或点别的 App | 输入行收起，文字保留，键盘归还 |
 

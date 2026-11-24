@@ -7,18 +7,23 @@ import UTodoCore
 @Observable
 final class CardViewModel {
     private let store: TodoStore?
+    private let configStore: ConfigStore
     @ObservationIgnored nonisolated(unsafe) private var observerToken: NSObjectProtocol?
+    @ObservationIgnored nonisolated(unsafe) private var configToken: NSObjectProtocol?
 
     private(set) var active: [Todo] = []
     private(set) var completed: [Todo] = []
     private(set) var dissolving: [Todo] = []
     private(set) var loadError: String?
+    private(set) var config: AppConfig
     var draft: String = ""
     var showsCompleted = false
     var focusTick = 0
 
-    init(store: TodoStore?, initialError: String? = nil) {
+    init(store: TodoStore?, initialError: String? = nil, configStore: ConfigStore = ConfigStore()) {
         self.store = store
+        self.configStore = configStore
+        self.config = configStore.load()
         self.loadError = initialError
         if store != nil { reload() }
         observeChanges()
@@ -27,6 +32,9 @@ final class CardViewModel {
     deinit {
         if let observerToken {
             DistributedNotificationCenter.default().removeObserver(observerToken)
+        }
+        if let configToken {
+            DistributedNotificationCenter.default().removeObserver(configToken)
         }
     }
 
@@ -135,6 +143,20 @@ final class CardViewModel {
         focusTick += 1
     }
 
+    /// 右键菜单改玻璃底色：写配置 → 发通知 → 自己和别的窗口都读一次
+    func setGlassOpacity(_ value: Double) {
+        var updated = config
+        updated.glassOpacity = value
+        do {
+            try configStore.save(updated)
+        } catch {
+            loadError = "透明度没存上：\(error)"
+            return
+        }
+        config = configStore.load()
+        postConfigChanged()
+    }
+
     private func observeChanges() {
         observerToken = DistributedNotificationCenter.default().addObserver(
             forName: storeChangedNotification,
@@ -142,6 +164,14 @@ final class CardViewModel {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.reload() }
+        }
+
+        configToken = DistributedNotificationCenter.default().addObserver(
+            forName: configChangedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.config = self?.configStore.load() ?? .default }
         }
     }
 }
