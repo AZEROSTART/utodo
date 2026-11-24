@@ -108,3 +108,28 @@ import Testing
         }
     }
 }
+
+@Suite struct FireworkOriginTests {
+    @Test func keepsOriginInsideTheCard() {
+        let size = CGSize(width: 268, height: 198)
+        #expect(Firework.clampOrigin(CGPoint(x: 26, y: 100), cardSize: size) == CGPoint(x: 26, y: 100))
+    }
+
+    @Test func pullsBottomRowOriginUpAfterCardShrinks() {
+        // 完成最后一行后卡片从 228 缩到 198，原来的 y=203 已经落到卡片外
+        let size = CGSize(width: 268, height: 198)
+        let clamped = Firework.clampOrigin(CGPoint(x: 26, y: 203), cardSize: size)
+        #expect(clamped == CGPoint(x: 26, y: 198 - Firework.originInset))
+    }
+
+    @Test func clampsLeftAndRightEdges() {
+        let size = CGSize(width: 268, height: 198)
+        #expect(Firework.clampOrigin(CGPoint(x: 0, y: 100), cardSize: size).x == Firework.originInset)
+        #expect(Firework.clampOrigin(CGPoint(x: 400, y: 100), cardSize: size).x == 268 - Firework.originInset)
+    }
+
+    @Test func tinyCardUsesCenter() {
+        let size = CGSize(width: 20, height: 20)
+        #expect(Firework.clampOrigin(CGPoint(x: 2, y: 19), cardSize: size) == CGPoint(x: 10, y: 10))
+    }
+}

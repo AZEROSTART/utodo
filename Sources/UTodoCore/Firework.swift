@@ -100,6 +100,19 @@ public enum Firework {
         p.spin * clampedTime(p, at: t)
     }
 
+    /// 起爆点到卡片边缘至少留这么多，否则冲击环大半被圆角裁掉
+    public static let originInset: CGFloat = 14
+
+    /// 完成最后一行时卡片会立刻变矮，原来的行坐标可能已经落到卡片外；
+    /// 把起爆点夹回可见区域，保证环和彩纸出现在眼前
+    public static func clampOrigin(_ origin: CGPoint, cardSize: CGSize, inset: CGFloat = originInset) -> CGPoint {
+        func clamp(_ value: CGFloat, upper: CGFloat) -> CGFloat {
+            guard upper > inset * 2 else { return upper / 2 }
+            return min(max(value, inset), upper - inset)
+        }
+        return CGPoint(x: clamp(origin.x, upper: cardSize.width), y: clamp(origin.y, upper: cardSize.height))
+    }
+
     private static func clampedTime(_ p: Particle, at t: TimeInterval) -> CGFloat {
         CGFloat(min(max(0, t - p.delay), p.life))
     }
