@@ -109,6 +109,15 @@ final class PanelController {
         dumpStateSoon("key-resigned")
     }
 
+    /// 拖动标题条/边缘：位移已经是屏幕坐标（y 向上），直接加到窗口原点
+    private func movePanel(by delta: CGSize) {
+        guard abs(delta.width) > 0.01 || abs(delta.height) > 0.01 else { return }
+        var frame = panel.frame
+        frame.origin.x += delta.width
+        frame.origin.y += delta.height
+        panel.setFrameOrigin(frame.origin)
+    }
+
     private func dumpStateSoon(_ tag: String) {
         guard ProcessInfo.processInfo.environment["UTODO_DEBUG_FRAME"] != nil else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
@@ -149,6 +158,9 @@ final class PanelController {
             },
             onEndEditing: { [weak self] in
                 self?.resignEditing()
+            },
+            onDragBy: { [weak self] delta in
+                self?.movePanel(by: delta)
             }
         )
         .padding(Theme.panelMargin)

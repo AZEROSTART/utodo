@@ -1,5 +1,6 @@
 import SwiftUI
 import UTodoCore
+import AppKit
 
 struct GlassBackground: View {
     var opacity: Double = AppConfig.default.glassOpacity
@@ -36,11 +37,14 @@ struct DesktopCardView: View {
     var onEditingChange: (Bool) -> Void = { _ in }
     var onRequestFocus: () -> Void = {}
     var onEndEditing: () -> Void = {}
+    /// 拖动标题条/留白时，把屏幕坐标下的位移交给窗口
+    var onDragBy: (CGSize) -> Void = { _ in }
     var isPreview: Bool = false
 
     @FocusState private var inputFocused: Bool
     @State private var hoveringRow: UUID?
     @State private var dissolveProgress: CGFloat = 0
+    @State private var lastDragMouse: CGPoint?
 
     /// 右键菜单里的三档玻璃底色；CLI 可以填任意值，菜单只负责常用档位
     static let glassPresets: [(name: String, value: Double)] = [
@@ -95,6 +99,28 @@ struct DesktopCardView: View {
         .onChange(of: model.focusTick) { _, _ in inputFocused = true }
         .onChange(of: inputFocused) { _, focused in onEditingChange(focused) }
         .onHover { inside in onHoverChange(inside) }
+        .simultaneousGesture(dragGesture)
+    }
+
+    /// 拖动标题条或边缘留白移动卡片。位移用屏幕坐标算：窗口跟着鼠标走时，
+    /// SwiftUI 的 translation 会一起被带走，只有 NSEvent.mouseLocation 是稳的。
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .local)
+            .onChanged { value in
+                let cardSize = CGSize(width: Theme.cardWidth, height: model.cardHeight)
+                guard !isPreview, CardDragZone.isHandle(at: value.startLocation, cardSize: cardSize) else {
+                    lastDragMouse = nil
+                    return
+                }
+                let current = NSEvent.mouseLocation
+                if let last = lastDragMouse {
+                    onDragBy(CGSize(width: current.x - last.x, height: current.y - last.y))
+                }
+                lastDragMouse = current
+            }
+            .onEnded { _ in
+                lastDragMouse = nil
+            }
     }
 
     // MARK: - 头部
