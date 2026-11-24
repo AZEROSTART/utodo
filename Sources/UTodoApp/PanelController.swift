@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import UTodoCore
 
 
@@ -6,12 +7,14 @@ import UTodoCore
 final class PanelController {
     static let cardWidth: CGFloat = 268
     static let cardHeight: CGFloat = 240
+    static var panelWidth: CGFloat { cardWidth + Theme.panelMargin * 2 }
 
     private let panel: NSPanel
     private let placementKey = "panel.placement"
+    private var installedHeight: CGFloat = 0
 
     init() {
-        let size = CGSize(width: Self.cardWidth, height: Self.cardHeight)
+        let size = CGSize(width: Self.panelWidth, height: Self.cardHeight + Theme.panelMargin * 2)
         panel = NSPanel(
             contentRect: CGRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -45,10 +48,51 @@ final class PanelController {
 
     func show() {
         panel.orderFrontRegardless()
+        if ProcessInfo.processInfo.environment["UTODO_DEBUG_FRAME"] != nil {
+            for delay in [0.0, 0.5] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [panel] in
+                    let content = panel.contentView?.frame.debugDescription ?? "nil"
+                    try? "t=\(delay) frame=\(panel.frame) content=\(content)"
+                        .write(toFile: "/tmp/utodo-frame.txt", atomically: true, encoding: .utf8)
+                }
+            }
+        }
     }
 
-    func setContent(_ view: NSView) {
-        panel.contentView = view
+    func install(model: CardViewModel) {
+        let view = DesktopCardView(model: model) { [weak self] cardHeight in
+            self?.resize(toCardHeight: cardHeight)
+        }
+        .padding(Theme.panelMargin)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        let host = NSHostingView(rootView: view)
+        host.frame = CGRect(
+            x: 0,
+            y: 0,
+            width: Self.panelWidth,
+            height: model.cardHeight + Theme.panelMargin * 2
+        )
+        panel.contentView = host
+        resize(toCardHeight: model.cardHeight)
+    }
+
+    private func resize(toCardHeight cardHeight: CGFloat) {
+        let height = cardHeight + Theme.panelMargin * 2
+        guard abs(installedHeight - height) > 0.5 else { return }
+        installedHeight = height
+
+        var frame = panel.frame
+        let delta = height - frame.height
+        guard abs(delta) > 0.5 else { return }
+        frame.size.height = height
+        frame.origin.y -= delta
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.allowsImplicitAnimation = true
+            panel.animator().setFrame(frame, display: true)
+        }
+        savePlacement()
     }
 
     // MARK: - 位置

@@ -169,7 +169,9 @@ public final class TodoStore: @unchecked Sendable {
     // MARK: - 内部
 
     private func resolveLocked(prefix: String) throws -> Todo {
-        let needle = prefix.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let needle = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "")
         guard !needle.isEmpty else { throw TodoStoreError.notFound }
 
         let db = try database()
