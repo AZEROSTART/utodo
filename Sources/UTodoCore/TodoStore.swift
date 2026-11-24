@@ -15,7 +15,19 @@ public final class TodoStore: @unchecked Sendable {
 
     private let url: URL
     private var db: OpaquePointer?
+    private var identity: FileIdentity?
     private let lock = NSLock()
+
+    private struct FileIdentity: Equatable {
+        let device: dev_t
+        let inode: ino_t
+
+        static func of(_ url: URL) -> FileIdentity? {
+            var info = stat()
+            guard stat(url.path, &info) == 0 else { return nil }
+            return FileIdentity(device: info.st_dev, inode: info.st_ino)
+        }
+    }
 
     public init(url: URL = TodoStore.defaultURL) throws {
         self.url = url
@@ -24,22 +36,39 @@ public final class TodoStore: @unchecked Sendable {
             withIntermediateDirectories: true
         )
 
-        var handle = try Self.open(at: url)
-        do {
-            try Self.prepareSchema(handle)
-        } catch {
-            sqlite3_close(handle)
-            try? FileManager.default.removeItem(at: url)
-            try? FileManager.default.removeItem(at: url.appendingPathExtension("wal"))
-            try? FileManager.default.removeItem(at: url.appendingPathExtension("shm"))
-            handle = try Self.open(at: url)
-            try Self.prepareSchema(handle)
+        if Self.isCorrupt(at: url) {
+            Self.quarantine(at: url)
         }
-        db = handle
+        db = try Self.openPrepared(at: url)
+        identity = FileIdentity.of(url)
     }
 
     deinit {
         if let db { sqlite3_close(db) }
+    }
+
+    /// 只有「文件存在且文件头不是 SQLite」才算损坏。其他错误（忙、只读、磁盘满）
+    /// 一律往上抛，绝不动用户的文件。
+    static func isCorrupt(at url: URL) -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let handle = try? FileHandle(forReadingFrom: url)
+        else { return false }
+        defer { try? handle.close() }
+        let header = handle.readData(ofLength: 16)
+        guard header.count == 16 else { return true }
+        return header != Data("SQLite format 3\u{0}".utf8)
+    }
+
+    private static func quarantine(at url: URL) {
+        let stamp = Int(Date().timeIntervalSince1970)
+        let target = url.deletingLastPathComponent()
+            .appending(path: url.lastPathComponent + "-corrupt-\(stamp)")
+        try? FileManager.default.moveItem(at: url, to: target)
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + "-wal"))
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: url.path + "-shm"))
+        FileHandle.standardError.write(
+            Data("utodo: 数据库文件已损坏，原文件保留在 \(target.path)\n".utf8)
+        )
     }
 
     // MARK: - 写入
@@ -147,7 +176,8 @@ public final class TodoStore: @unchecked Sendable {
         defer { sqlite3_finalize(stmt) }
 
         var todos: [Todo] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             guard let rawID = sqlite3_column_text(stmt, 0),
                   let rawTitle = sqlite3_column_text(stmt, 1),
                   let id = UUID(uuidString: String(cString: rawID))
@@ -162,6 +192,10 @@ public final class TodoStore: @unchecked Sendable {
                 createdAt: createdAt,
                 completedAt: completedAt
             ))
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw TodoStoreError.database(String(cString: sqlite3_errmsg(db)))
         }
         return todos
     }
@@ -173,20 +207,25 @@ public final class TodoStore: @unchecked Sendable {
             .lowercased()
             .replacingOccurrences(of: "-", with: "")
         guard !needle.isEmpty else { throw TodoStoreError.notFound }
+        let escaped = needle
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
 
         let db = try database()
         let stmt = try prepare(
             db,
             """
             SELECT id, title, created_at, completed_at FROM todos
-            WHERE lower(replace(id, '-', '')) LIKE ? || '%'
+            WHERE lower(replace(id, '-', '')) LIKE ? || '%' ESCAPE '\\'
             """
         )
         defer { sqlite3_finalize(stmt) }
-        sqlite3_bind_text(stmt, 1, needle, -1, sqliteTransient)
+        sqlite3_bind_text(stmt, 1, escaped, -1, sqliteTransient)
 
         var matches: [Todo] = []
-        while sqlite3_step(stmt) == SQLITE_ROW {
+        var rc = sqlite3_step(stmt)
+        while rc == SQLITE_ROW {
             guard let rawID = sqlite3_column_text(stmt, 0),
                   let rawTitle = sqlite3_column_text(stmt, 1),
                   let id = UUID(uuidString: String(cString: rawID))
@@ -200,6 +239,10 @@ public final class TodoStore: @unchecked Sendable {
                 createdAt: Date(timeIntervalSinceReferenceDate: sqlite3_column_double(stmt, 2)),
                 completedAt: completedAt
             ))
+            rc = sqlite3_step(stmt)
+        }
+        guard rc == SQLITE_DONE else {
+            throw TodoStoreError.database(String(cString: sqlite3_errmsg(db)))
         }
 
         switch matches.count {
@@ -210,8 +253,28 @@ public final class TodoStore: @unchecked Sendable {
     }
 
     private func database() throws -> OpaquePointer {
+        // 文件被删除或被别的进程替换后，旧连接还挂在已 unlink 的 inode 上，
+        // 继续写就等于写进一个没人看得见的库 —— 每次操作前确认还是同一个文件。
+        if FileIdentity.of(url) != identity {
+            if let stale = db { sqlite3_close(stale) }
+            db = nil
+            if Self.isCorrupt(at: url) { Self.quarantine(at: url) }
+            db = try Self.openPrepared(at: url)
+            identity = FileIdentity.of(url)
+        }
         guard let db else { throw TodoStoreError.database("数据库未打开") }
         return db
+    }
+
+    private static func openPrepared(at url: URL) throws -> OpaquePointer {
+        let handle = try open(at: url)
+        do {
+            try prepareSchema(handle)
+        } catch {
+            sqlite3_close(handle)
+            throw error
+        }
+        return handle
     }
 
     private static func open(at url: URL) throws -> OpaquePointer {

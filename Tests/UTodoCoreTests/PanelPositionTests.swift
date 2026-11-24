@@ -21,6 +21,25 @@ import Testing
         #expect(r.origin.x == CGFloat(1132))
     }
 
+    @Test func placementOffScreenIsClampedBackIntoTheScreen() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let stored = PanelPlacement(displayID: "A", offsetFromRight: -400, offsetFromTop: 800)
+        let r = PanelPosition.resolve(stored, panelSize: CGSize(width: 268, height: 240),
+                                      screens: [("A", screen)], mainScreenID: "A")
+        #expect(r.origin.x >= screen.minX)
+        #expect(r.origin.y >= screen.minY)
+        #expect(r.origin.x + 268 <= screen.maxX)
+        #expect(r.origin.y + 240 <= screen.maxY)
+    }
+
+    @Test func placementLargerThanScreenFallsBackToDefault() {
+        let screen = CGRect(x: 0, y: 0, width: 200, height: 120)
+        let stored = PanelPlacement(displayID: "A", offsetFromRight: 40, offsetFromTop: 60)
+        let r = PanelPosition.resolve(stored, panelSize: CGSize(width: 268, height: 240),
+                                      screens: [("A", screen)], mainScreenID: "A")
+        #expect(r.origin == CGPoint(x: 0, y: 0))
+    }
+
     @Test func dragRoundTripsToPlacement() {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
         let p = PanelPosition.placement(forOrigin: CGPoint(x: 100, y: 500),

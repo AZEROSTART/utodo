@@ -13,6 +13,6 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$SCRATCH/release/UTodoApp" "$APP/Contents/MacOS/UTodo"
 cp Support/Info.plist "$APP/Contents/Info.plist"
-codesign --force --sign - --identifier com.azerostart.utodo "$APP" 2>/dev/null
+codesign --force --sign - --identifier com.azerostart.utodo "$APP"
 
 echo "built $APP"

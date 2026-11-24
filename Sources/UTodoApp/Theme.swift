@@ -6,7 +6,7 @@ enum Theme {
     static let bodySize: CGFloat = 12.5
     static let rowHeight: CGFloat = 30
     static let maxVisibleRows = 5
-    static let panelMargin: CGFloat = 16
+    static let panelMargin: CGFloat = 36
     static let dimAlpha: CGFloat = 0.55
     static let dimDuration: CGFloat = 0.3
 

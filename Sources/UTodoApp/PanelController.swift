@@ -2,7 +2,6 @@ import AppKit
 import SwiftUI
 import UTodoCore
 
-
 @MainActor
 final class PanelController {
     static let cardWidth: CGFloat = 268
@@ -20,6 +19,7 @@ final class PanelController {
     private var isFullscreenVisible = false
     private var isHovering = false
     private var isEditing = false
+    private var pendingPlacementSave: DispatchWorkItem?
 
     init() {
         let size = CGSize(width: Self.panelWidth, height: Self.cardHeight + Theme.panelMargin * 2)
@@ -38,6 +38,7 @@ final class PanelController {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.isMovableByWindowBackground = true
+        panel.becomesKeyOnlyIfNeeded = true
         panel.animationBehavior = .none
         panel.contentView = Self.placeholderView(size: size)
 
@@ -46,7 +47,15 @@ final class PanelController {
             object: panel,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.savePlacement() }
+            MainActor.assumeIsolated { self?.schedulePlacementSave() }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.keyWasResigned() }
         }
 
         placeOnScreen()
@@ -62,6 +71,12 @@ final class PanelController {
                 self?.focusInput()
             }
         }
+        if let raw = ProcessInfo.processInfo.environment["UTODO_DEBUG_RESIGN_AFTER"],
+           let delay = Double(raw) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.resignEditing()
+            }
+        }
     }
 
     func focusInput() {
@@ -73,11 +88,23 @@ final class PanelController {
         dumpStateSoon("focused")
     }
 
-    private func resignEditing() {
+    /// 交出键盘：面板不再是 key window，按键回到前台 App。
+    func resignEditing() {
+        guard isEditing || panel.isKeyWindow else { return }
         isEditing = false
         applyAlpha()
         panel.makeFirstResponder(nil)
+        if panel.isKeyWindow {
+            panel.resignKey()
+        }
         dumpStateSoon("resigned")
+    }
+
+    private func keyWasResigned() {
+        guard isEditing else { return }
+        isEditing = false
+        applyAlpha()
+        dumpStateSoon("key-resigned")
     }
 
     private func dumpStateSoon(_ tag: String) {
@@ -114,6 +141,12 @@ final class PanelController {
             onEditingChange: { [weak self] editing in
                 self?.isEditing = editing
                 self?.applyAlpha()
+            },
+            onRequestFocus: { [weak self] in
+                self?.focusInput()
+            },
+            onEndEditing: { [weak self] in
+                self?.resignEditing()
             }
         )
         .padding(Theme.panelMargin)
@@ -156,6 +189,14 @@ final class PanelController {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.resignEditing() }
         }
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.placeOnScreen() }
+        }
     }
 
     private func applyAlpha() {
@@ -185,10 +226,10 @@ final class PanelController {
             context.allowsImplicitAnimation = true
             panel.animator().setFrame(frame, display: true)
         }
-        savePlacement()
+        schedulePlacementSave()
     }
 
-    // MARK: - 位置
+    // MARK: - 位置（一律按卡片坐标算，面板边缘留给阴影）
 
     private struct ScreenRef {
         let id: String
@@ -210,17 +251,33 @@ final class PanelController {
         return ScreenRef(id: String(number.intValue), frame: main.frame)
     }
 
+    private var cardSize: CGSize { CGSize(width: Self.cardWidth, height: installedHeight - Theme.panelMargin * 2) }
+
+    /// 卡片左下角在屏幕上的位置（面板左下角还要再减掉阴影边距）
+    private var cardOrigin: CGPoint {
+        CGPoint(
+            x: panel.frame.minX + Theme.panelMargin,
+            y: panel.frame.minY + Theme.panelMargin
+        )
+    }
+
     private func placeOnScreen() {
         let screens = screenRefs.map { (id: $0.id, frame: $0.frame) }
         let mainID = mainScreenRef?.id ?? screens.first?.id ?? "0"
+        let size = cardSize.width > 0 && cardSize.height > 0
+            ? cardSize
+            : CGSize(width: Self.cardWidth, height: Self.cardHeight)
         let resolved = PanelPosition.resolve(
             loadPlacement(),
-            panelSize: panel.frame.size,
+            panelSize: size,
             screens: screens,
             mainScreenID: mainID
         )
-        panel.setFrameOrigin(resolved.origin)
-        savePlacement()
+        panel.setFrameOrigin(CGPoint(
+            x: resolved.origin.x - Theme.panelMargin,
+            y: resolved.origin.y - Theme.panelMargin
+        ))
+        schedulePlacementSave()
     }
 
     private func loadPlacement() -> PanelPlacement? {
@@ -228,11 +285,20 @@ final class PanelController {
         return try? JSONDecoder().decode(PanelPlacement.self, from: data)
     }
 
+    private func schedulePlacementSave() {
+        pendingPlacementSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.savePlacement() }
+        }
+        pendingPlacementSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
     private func savePlacement() {
         let screens = screenRefs.map { (id: $0.id, frame: $0.frame) }
         guard let placement = PanelPosition.placement(
-            forOrigin: panel.frame.origin,
-            panelSize: panel.frame.size,
+            forOrigin: cardOrigin,
+            panelSize: CGSize(width: Self.cardWidth, height: installedHeight - Theme.panelMargin * 2),
             screens: screens
         ) else { return }
         guard let data = try? JSONEncoder().encode(placement) else { return }

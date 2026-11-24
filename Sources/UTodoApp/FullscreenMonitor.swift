@@ -4,10 +4,18 @@ import UTodoCore
 
 @MainActor
 final class FullscreenMonitor {
-    private var timer: Timer?
+    nonisolated(unsafe) private var timer: Timer?
     private var lastValue: Bool?
     private var onChange: ((Bool) -> Void)?
     private weak var panel: NSWindow?
+    nonisolated(unsafe) private var activationToken: NSObjectProtocol?
+
+    deinit {
+        timer?.invalidate()
+        if let activationToken {
+            NSWorkspace.shared.notificationCenter.removeObserver(activationToken)
+        }
+    }
 
     func start(panel: NSWindow, onChange: @escaping (Bool) -> Void) {
         self.panel = panel
@@ -19,7 +27,8 @@ final class FullscreenMonitor {
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
 
-        NotificationCenter.default.addObserver(
+        // NSWorkspace 的通知只发在它自己的 notificationCenter 上
+        activationToken = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main

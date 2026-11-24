@@ -34,6 +34,8 @@ struct DesktopCardView: View {
     var onHeightChange: (CGFloat) -> Void
     var onHoverChange: (Bool) -> Void = { _ in }
     var onEditingChange: (Bool) -> Void = { _ in }
+    var onRequestFocus: () -> Void = {}
+    var onEndEditing: () -> Void = {}
     var isPreview: Bool = false
 
     @FocusState private var inputFocused: Bool
@@ -56,7 +58,7 @@ struct DesktopCardView: View {
         .background(GlassBackground())
         .contentShape(RoundedRectangle(cornerRadius: Theme.corner, style: .continuous))
         .contextMenu {
-            Button("添加一件事") { model.requestFocus() }
+            Button("添加一件事") { onRequestFocus() }
             Button(model.showsCompleted ? "收起已完成" : "显示已完成") {
                 withAnimation(.easeInOut(duration: 0.2)) { model.showsCompleted.toggle() }
             }
@@ -66,6 +68,7 @@ struct DesktopCardView: View {
             Divider()
             Button("退出 utodo") { NSApp.terminate(nil) }
         }
+        .animation(.easeOut(duration: 0.18), value: model.active)
         .onChange(of: model.cardHeight) { _, height in onHeightChange(height) }
         .onAppear { onHeightChange(model.cardHeight) }
         .onChange(of: model.focusTick) { _, _ in inputFocused = true }
@@ -112,6 +115,7 @@ struct DesktopCardView: View {
                     .onSubmit { model.submitDraft() }
                     .onKeyPress(.escape) {
                         inputFocused = false
+                        onEndEditing()
                         return .handled
                     }
             }
@@ -128,7 +132,7 @@ struct DesktopCardView: View {
         )
         .padding(.top, 6)
         .padding(.bottom, 2)
-        .onTapGesture { inputFocused = true }
+        .onTapGesture { onRequestFocus() }
         .contentShape(Rectangle())
     }
 
@@ -137,9 +141,10 @@ struct DesktopCardView: View {
     private var activeRows: some View {
         Group {
             if model.active.isEmpty {
-                Text("都清空了。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.faintText)
+                Text(model.loadError ?? "都清空了。")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(model.loadError == nil ? Theme.faintText : Color.orange.opacity(0.85))
+                    .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 9)
                     .padding(.horizontal, 4)
@@ -242,9 +247,23 @@ struct DesktopCardView: View {
     }
 
     private var completedRows: some View {
-        VStack(spacing: 0) {
-            ForEach(model.completed.prefix(Theme.maxVisibleRows)) { todo in
-                completedRow(todo, interactive: true)
+        Group {
+            if model.completed.count > Theme.maxVisibleRows && !isPreview {
+                ScrollView(.vertical) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(model.completed) { todo in
+                            completedRow(todo, interactive: true)
+                        }
+                    }
+                }
+                .frame(height: CGFloat(Theme.maxVisibleRows) * Theme.rowHeight)
+                .scrollIndicators(.never)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(model.completed.prefix(Theme.maxVisibleRows)) { todo in
+                        completedRow(todo, interactive: true)
+                    }
+                }
             }
         }
         .transition(.opacity)

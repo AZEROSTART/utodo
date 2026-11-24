@@ -11,6 +11,7 @@ BIN_DIR="$HOME/.local/bin"
 swift build -c release --product utodo --scratch-path .build-app
 
 mkdir -p "$APP_DIR" "$BIN_DIR"
+pkill -f "$APP_DIR/UTodo.app/Contents/MacOS/UTodo" 2>/dev/null || true
 rm -rf "$APP_DIR/UTodo.app"
 cp -R build/UTodo.app "$APP_DIR/UTodo.app"
 cp .build-app/release/utodo "$BIN_DIR/utodo"
@@ -21,3 +22,5 @@ echo "CLI:  $BIN_DIR/utodo"
 echo
 echo "如果 $BIN_DIR 还不在 PATH 里，把这行加进 ~/.zshrc："
 echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+
+open "$APP_DIR/UTodo.app"

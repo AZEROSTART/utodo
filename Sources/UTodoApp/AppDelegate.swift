@@ -8,8 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var model: CardViewModel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let store = try? TodoStore()
-        let model = CardViewModel(store: store)
+        let model: CardViewModel
+        if let store = try? TodoStore() {
+            model = CardViewModel(store: store)
+        } else {
+            let message = "数据库打不开：\(TodoStore.defaultURL.path)"
+            FileHandle.standardError.write(Data("utodo: \(message)\n".utf8))
+            model = CardViewModel(store: nil, initialError: message)
+        }
         let controller = PanelController()
         controller.install(model: model)
         controller.show()

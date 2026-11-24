@@ -43,6 +43,11 @@ final class HotKeyMonitor {
             &hotKeyRef
         )
         isRegistered = status == noErr
+        if status != noErr {
+            FileHandle.standardError.write(
+                Data("utodo: ⌥Space 全局快捷键注册失败（可能被别的 App 占用），status=\(status)\n".utf8)
+            )
+        }
     }
 
     func stop() {

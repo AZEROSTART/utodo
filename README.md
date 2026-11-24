@@ -73,9 +73,10 @@ CLI 和 App 直接读写同一个 SQLite 文件（`~/Library/Application Support
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-swift test -j 1              # 只链一个，并行链接偶发失败
-./Scripts/build-app.sh       # 产物在 build/UTodo.app
-./Scripts/cli-smoke.sh       # CLI 冒烟
+swift test -j 1                                    # 只链一个，并行链接偶发失败
+swift build --product utodo                        # CLI 在 .build/debug/utodo
+./Scripts/build-app.sh                             # App 在 build/UTodo.app
+./Scripts/cli-smoke.sh .build/debug/utodo          # CLI 冒烟
 ./build/UTodo.app/Contents/MacOS/UTodo --render-preview /tmp/preview.png   # 离屏渲染卡片
 ```
 
@@ -86,4 +87,4 @@ swift test -j 1              # 只链一个，并行链接偶发失败
 - 只支持 macOS 26+，只在 Apple Silicon 上验证过
 - 不申请任何系统权限（辅助功能、输入监控、屏幕录制都没有）；`⌥Space` 用的是 Carbon `RegisterEventHotKey`
 - 全屏检测靠窗口层级和尺寸，普通窗口铺满整块屏（无边框全屏窗口）会被当成全屏
-- 数据库损坏时自动删库重建，不弹窗、不备份
+- 数据库文件损坏（文件头不是 SQLite）时，原文件会被改名成 `utodo.sqlite3-corrupt-<时间戳>` 留证，App 重建空库继续跑；其他数据库错误（被占用、只读、磁盘满）会如实报错，不动文件

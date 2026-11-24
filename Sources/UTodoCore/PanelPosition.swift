@@ -45,9 +45,14 @@ public enum PanelPosition {
         let frame = screens.first(where: { $0.id == placement.displayID })?.frame
             ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
 
-        let origin = CGPoint(
+        let raw = CGPoint(
             x: frame.maxX - placement.offsetFromRight - panelSize.width,
             y: frame.maxY - placement.offsetFromTop - panelSize.height
+        )
+        // 屏幕变小或换屏后旧偏移可能把卡片推到屏外，裁回可见范围（裁不下就贴左上）
+        let origin = CGPoint(
+            x: min(max(raw.x, frame.minX), max(frame.minX, frame.maxX - panelSize.width)),
+            y: min(max(raw.y, frame.minY), max(frame.minY, frame.maxY - panelSize.height))
         )
         return (placement, origin)
     }
