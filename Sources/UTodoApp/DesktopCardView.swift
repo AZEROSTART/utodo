@@ -188,13 +188,22 @@ struct DesktopCardView: View {
             if isPreview {
                 Text("添加一件事…")
                     .font(.system(size: Theme.bodySize))
-                    .foregroundStyle(Color.white.opacity(0.42))
+                    .foregroundStyle(Theme.placeholderText)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                TextField("添加一件事…", text: $model.draft)
+                TextField("", text: $model.draft)
                     .textFieldStyle(.plain)
                     .font(.system(size: Theme.bodySize))
                     .foregroundStyle(Theme.primaryText)
+                    // prompt 在部分系统外观下会退回黑色，自己铺一层占位文字，颜色可控
+                    .overlay(alignment: .leading) {
+                        if model.draft.isEmpty {
+                            Text("添加一件事…")
+                                .font(.system(size: Theme.bodySize))
+                                .foregroundStyle(Theme.placeholderText)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     .focused($inputFocused)
                     .onSubmit { model.submitDraft() }
                     .onKeyPress(.escape) {

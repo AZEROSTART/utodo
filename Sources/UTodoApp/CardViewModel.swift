@@ -10,6 +10,8 @@ final class CardViewModel {
     private let configStore: ConfigStore
     @ObservationIgnored nonisolated(unsafe) private var observerToken: NSObjectProtocol?
     @ObservationIgnored nonisolated(unsafe) private var configToken: NSObjectProtocol?
+    /// 窗口跟着待办数量走：0 条时彻底隐藏，有新的再加回来
+    @ObservationIgnored var onActiveCountChange: ((Int) -> Void)?
 
     private(set) var active: [Todo] = []
     private(set) var completed: [Todo] = []
@@ -71,6 +73,7 @@ final class CardViewModel {
             active = all.filter { !$0.isCompleted }
             completed = all.filter(\.isCompleted)
             loadError = nil
+            onActiveCountChange?(active.count)
         } catch {
             loadError = "读库失败：\(describe(error))"
         }

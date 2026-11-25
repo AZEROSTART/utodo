@@ -21,6 +21,7 @@ final class PanelController {
     private var isEditing = false
     private var pendingPlacementSave: DispatchWorkItem?
     private var dimAlpha = AppConfig.default.dimAlpha
+    private var pendingHide: DispatchWorkItem?
     nonisolated(unsafe) private var configToken: NSObjectProtocol?
 
     init() {
@@ -140,6 +141,9 @@ final class PanelController {
 
     func install(model: CardViewModel) {
         self.model = model
+        model.onActiveCountChange = { [weak self] count in
+            self?.cardCountChanged(count)
+        }
         let view = DesktopCardView(
             model: model,
             onHeightChange: { [weak self] cardHeight in
@@ -234,6 +238,42 @@ final class PanelController {
             context.allowsImplicitAnimation = true
             panel.animator().alphaValue = target
         }
+    }
+
+    // MARK: - 待办清空就收窗，有新待办再出来
+
+    /// 清了最后一条就彻底收起；等烟花放完再收，保留「完成」的那一下反馈
+    private func cardCountChanged(_ count: Int) {
+        pendingHide?.cancel()
+        pendingHide = nil
+        guard count == 0 else {
+            showCardIfHidden()
+            return
+        }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard self.model?.active.isEmpty ?? false, !self.isEditing else { return }
+            self.hideCard()
+        }
+        pendingHide = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Firework.maxLifetime + 0.15, execute: work)
+    }
+
+    private func showCardIfHidden() {
+        guard !panel.isVisible else { return }
+        panel.orderFrontRegardless()
+        applyAlpha()
+        dumpState("shown-by-todo")
+    }
+
+    /// 彻底隐藏：窗口不占屏幕、也点不到；⌥Space 仍能把卡片叫回来输入
+    private func hideCard() {
+        isEditing = false
+        isHovering = false
+        panel.makeFirstResponder(nil)
+        if panel.isKeyWindow { panel.resignKey() }
+        panel.orderOut(nil)
+        dumpState("hidden-empty")
     }
 
     private func resize(toCardHeight cardHeight: CGFloat) {

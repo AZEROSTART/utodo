@@ -12,6 +12,7 @@ enum Theme {
     static let primaryText = Color.white.opacity(0.94)
     static let secondaryText = Color.white.opacity(0.55)
     static let faintText = Color.white.opacity(0.40)
+    static let placeholderText = Color.white.opacity(0.42)
     static let hairline = Color.white.opacity(0.065)
 
     static let accent = Color(hue: 0.56, saturation: 0.55, brightness: 1.0)
